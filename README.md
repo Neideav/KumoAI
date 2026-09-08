@@ -144,8 +144,8 @@ Kumo dikonfigurasi untuk menghasilkan interaksi yang **sejajar dengan standar as
 
 1. **Clone repositori**:
    ```bash
-   git clone https://github.com/username/kumo-ai.git
-   cd kumo-ai
+   git clone https://github.com/Neideav/KumoAI.git
+   cd KumoAI
    ```
 
 2. **Install dependensi**:

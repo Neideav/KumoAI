@@ -1,0 +1,30 @@
+{
+  "appId": "com.kumo.ai",
+  "appName": "Kumo AI",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#121214",
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 1500,
+      "backgroundColor": "#121214",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#121214"
+    }
+  }
+}

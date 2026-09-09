@@ -1,0 +1,23 @@
+{
+  "name": "kumo-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Kumo AI - Android App (Capacitor wrapper for KumoAI web app)",
+  "scripts": {
+    "build:web": "cd ../KumoAI && npm run build",
+    "copy:web": "powershell -Command \"if (Test-Path www) { Remove-Item www -Recurse -Force }; Copy-Item -Path ../KumoAI/dist -Destination www -Recurse\"",
+    "sync": "npm run build:web && npm run copy:web && npx cap sync android",
+    "open": "npx cap open android",
+    "run:android": "npx cap run android",
+    "build:apk": "npm run sync && cd android && .\\gradlew assembleDebug",
+    "build:release": "npm run sync && cd android && .\\gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.2"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.2",
+    "@capacitor/cli": "^6.2.2",
+    "typescript": "^7.0.2"
+  }
+}

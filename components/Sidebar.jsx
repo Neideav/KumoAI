@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   PanelLeft,
   Plus,
@@ -19,6 +20,7 @@ import {
   FileText,
   MessageSquare
 } from 'lucide-react';
+import { dropdownVariants } from '../utils/motion';
 
 export default function Sidebar({
   isOpen,
@@ -46,20 +48,28 @@ export default function Sidebar({
 
   const menuRef = useRef(null);
 
-  // Close context menu on outside click
+  // Close context menu on outside click or Escape key
   useEffect(() => {
     const handleDocClick = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setOpenMenuChatId(null);
       }
     };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setOpenMenuChatId(null);
+      }
+    };
     if (openMenuChatId) {
       document.addEventListener('mousedown', handleDocClick);
+      window.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleDocClick);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [openMenuChatId]);
+
 
   // Sort chats: Pinned first, then by updatedAt desc
   const sortedChats = [...chats].sort((a, b) => {
@@ -388,91 +398,111 @@ export default function Sidebar({
                       className="history-act-btn"
                       onClick={() => setOpenMenuChatId(openMenuChatId === chat.id ? null : chat.id)}
                       title="Opsi percakapan"
+                      aria-haspopup="menu"
+                      aria-expanded={openMenuChatId === chat.id}
+                      aria-label="Opsi percakapan"
                     >
                       <MoreHorizontal size={15} />
                     </button>
 
                     {/* Chat Context Menu */}
-                    {openMenuChatId === chat.id && (
-                      <div className="chat-context-menu" ref={menuRef}>
-                        <button
-                          type="button"
-                          className="context-menu-item"
-                          onClick={() => {
-                            setOpenMenuChatId(null);
-                            onOpenShareModal?.(chat);
-                          }}
+                    <AnimatePresence>
+                      {openMenuChatId === chat.id && (
+                        <motion.div
+                          className="chat-context-menu"
+                          ref={menuRef}
+                          variants={dropdownVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                          role="menu"
                         >
-                          <Share2 size={15} />
-                          <span>Share conversation</span>
-                        </button>
+                          <button
+                            type="button"
+                            className="context-menu-item"
+                            onClick={() => {
+                              setOpenMenuChatId(null);
+                              onOpenShareModal?.(chat);
+                            }}
+                            role="menuitem"
+                          >
+                            <Share2 size={15} />
+                            <span>Share conversation</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          className="context-menu-item"
-                          onClick={() => {
-                            onTogglePinChat?.(chat.id);
-                            setOpenMenuChatId(null);
-                          }}
-                        >
-                          <Pin size={15} />
-                          <span>{chat.pinned ? 'Unpin' : 'Pin'}</span>
-                        </button>
+                          <button
+                            type="button"
+                            className="context-menu-item"
+                            onClick={() => {
+                              onTogglePinChat?.(chat.id);
+                              setOpenMenuChatId(null);
+                            }}
+                            role="menuitem"
+                          >
+                            <Pin size={15} />
+                            <span>{chat.pinned ? 'Unpin' : 'Pin'}</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          className="context-menu-item"
-                          onClick={() => startRename(chat)}
-                        >
-                          <Edit3 size={15} />
-                          <span>Rename</span>
-                        </button>
+                          <button
+                            type="button"
+                            className="context-menu-item"
+                            onClick={() => startRename(chat)}
+                            role="menuitem"
+                          >
+                            <Edit3 size={15} />
+                            <span>Rename</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          className="context-menu-item"
-                          onClick={() => handleDownloadText(chat)}
-                        >
-                          <Download size={15} />
-                          <span>Download TXT</span>
-                        </button>
+                          <button
+                            type="button"
+                            className="context-menu-item"
+                            onClick={() => handleDownloadText(chat)}
+                            role="menuitem"
+                          >
+                            <Download size={15} />
+                            <span>Download TXT</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          className="context-menu-item"
-                          onClick={() => handleExportDocs(chat)}
-                        >
-                          <FileText size={15} />
-                          <span>Export to Docs</span>
-                        </button>
+                          <button
+                            type="button"
+                            className="context-menu-item"
+                            onClick={() => handleExportDocs(chat)}
+                            role="menuitem"
+                          >
+                            <FileText size={15} />
+                            <span>Export to Docs</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          className="context-menu-item"
-                          onClick={() => {
-                            onRouteChange('journal');
-                            setOpenMenuChatId(null);
-                          }}
-                        >
-                          <BookOpen size={15} />
-                          <span>Go to journal</span>
-                        </button>
+                          <button
+                            type="button"
+                            className="context-menu-item"
+                            onClick={() => {
+                              onRouteChange('journal');
+                              setOpenMenuChatId(null);
+                            }}
+                            role="menuitem"
+                          >
+                            <BookOpen size={15} />
+                            <span>Go to journal</span>
+                          </button>
 
-                        <div className="context-menu-divider" />
+                          <div className="context-menu-divider" />
 
-                        <button
-                          type="button"
-                          className="context-menu-item danger"
-                          onClick={() => {
-                            onDeleteChat(chat.id);
-                            setOpenMenuChatId(null);
-                          }}
-                        >
-                          <Trash2 size={15} />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            type="button"
+                            className="context-menu-item danger"
+                            onClick={() => {
+                              onDeleteChat(chat.id);
+                              setOpenMenuChatId(null);
+                            }}
+                            role="menuitem"
+                          >
+                            <Trash2 size={15} />
+                            <span>Delete</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
               ))

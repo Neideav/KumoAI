@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import {
   GraduationCap,
   BookOpen,
@@ -11,6 +12,8 @@ import {
   Copy,
   Check
 } from 'lucide-react';
+import { routeViewVariants } from '../utils/motion';
+
 
 const STUDY_TOOLS = [
   {
@@ -67,7 +70,12 @@ export default function StudentsView({ onLaunchChatWithPrompt }) {
   };
 
   return (
-    <div className="view-container student-view">
+    <motion.div
+      className="view-container student-view"
+      variants={routeViewVariants}
+      initial="hidden"
+      animate="visible"
+    >
       <div className="view-header">
         <div className="view-badge">
           <GraduationCap size={16} />
@@ -139,6 +147,6 @@ export default function StudentsView({ onLaunchChatWithPrompt }) {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

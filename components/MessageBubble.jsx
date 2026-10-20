@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import {
   Copy,
   Check,
@@ -6,30 +7,30 @@ import {
   ThumbsDown,
   Volume2,
   RefreshCw,
-  Lightbulb,
-  ChevronDown,
-  ChevronUp,
   Globe,
   ExternalLink
 } from 'lucide-react';
 import { renderMarkdown } from '../utils/markdownRenderer';
+import ThoughtLine from './ThoughtLine';
 
 export default function MessageBubble({
   message,
   onRegenerate,
-  isStreaming
+  isStreaming = false,
+  requestStatus = 'idle',
+  requestStartTime,
+  requestEndTime
 }) {
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [reasoningOpen, setReasoningOpen] = useState(true);
 
   const isUser = message.role === 'user';
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(message.content);
+      await navigator.clipboard.writeText(message.content || '');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -46,7 +47,8 @@ export default function MessageBubble({
       }
 
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(message.content.replace(/```[\s\S]*?```/g, 'Code block omitted.'));
+      const cleanContent = (message.content || '').replace(/```[\s\S]*?```/g, 'Code block omitted.');
+      const utterance = new SpeechSynthesisUtterance(cleanContent);
       const voices = window.speechSynthesis.getVoices();
       const idVoice = voices.find(v => v.lang.includes('id') || v.lang.includes('ID'));
       if (idVoice) utterance.voice = idVoice;
@@ -61,7 +63,12 @@ export default function MessageBubble({
 
   if (isUser) {
     return (
-      <div className="message-item user">
+      <motion.div
+        className="message-item user"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      >
         {message.attachment && (
           <div className="user-attachment-preview">
             <img src={message.attachment.data} alt={message.attachment.name || 'Uploaded preview'} />
@@ -70,31 +77,33 @@ export default function MessageBubble({
         <div className="user-bubble">
           {message.content}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
+  // Assistant status determination
+  const shouldShowThoughtLine = isStreaming || Boolean(message.thinking) || Boolean(message.startTime);
+  const assistantStatus = isStreaming
+    ? (requestStatus !== 'idle' ? requestStatus : (message.content ? 'streaming' : 'waiting'))
+    : (message.status || (message.isError ? 'error' : 'completed'));
+
   return (
-    <div className="message-item assistant">
-      {/* Reasoning / Thinking Process Accordion */}
-      {message.thinking && (
-        <div className="reasoning-box">
-          <div
-            className="reasoning-header"
-            onClick={() => setReasoningOpen(!reasoningOpen)}
-          >
-            <div className="reasoning-title-left">
-              <Lightbulb size={15} color="#7c3aed" />
-              <span>Thinking Process</span>
-            </div>
-            {reasoningOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </div>
-          {reasoningOpen && (
-            <div className="reasoning-content">
-              {message.thinking}
-            </div>
-          )}
-        </div>
+    <motion.div
+      className="message-item assistant"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {/* React Bits Thought Line for AI Status & Thinking Process */}
+      {shouldShowThoughtLine && (
+        <ThoughtLine
+          status={assistantStatus}
+          startTime={isStreaming ? requestStartTime : message.startTime}
+          endTime={isStreaming ? requestEndTime : message.endTime}
+          thinkingContent={message.thinking}
+          collapsible={Boolean(message.thinking)}
+          showTimer={true}
+        />
       )}
 
       {/* Deep Search Sources */}
@@ -110,7 +119,7 @@ export default function MessageBubble({
                 key={idx}
                 href={src.url}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="search-source-pill"
               >
                 <span>{src.title}</span>
@@ -121,17 +130,8 @@ export default function MessageBubble({
         </div>
       )}
 
-      {/* 3-Dots Minimal Loading Indicator */}
-      {isStreaming && !message.content && !message.thinking && (
-        <div className="loading-dots-container">
-          <span className="loading-dot" />
-          <span className="loading-dot" />
-          <span className="loading-dot" />
-        </div>
-      )}
-
       {/* Assistant Main Text (Markdown) */}
-      {(message.content || (isStreaming && message.content)) && (
+      {(message.content || (isStreaming && message.content)) ? (
         <div className="assistant-bubble">
           {message.content ? (
             <div
@@ -141,60 +141,76 @@ export default function MessageBubble({
           ) : null}
           {isStreaming && <span className="streaming-cursor" />}
         </div>
-      )}
+      ) : null}
 
       {/* Message Action Toolbar */}
       {!isStreaming && message.content && (
-        <div className="message-actions-toolbar">
-          <button
+        <div className="message-actions-toolbar" role="toolbar" aria-label="Aksi pesan">
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            type="button"
             className="msg-action-btn"
             onClick={handleCopy}
-            title={copied ? "Copied!" : "Copy message"}
+            title={copied ? "Copied!" : "Salin pesan"}
+            aria-label="Salin pesan"
           >
             {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            type="button"
             className={`msg-action-btn ${liked ? 'active-like' : ''}`}
             onClick={() => {
               setLiked(!liked);
               if (disliked) setDisliked(false);
             }}
             title="Good response"
+            aria-label="Respons bagus"
           >
             <ThumbsUp size={14} />
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            type="button"
             className={`msg-action-btn ${disliked ? 'active-dislike' : ''}`}
             onClick={() => {
               setDisliked(!disliked);
               if (liked) setLiked(false);
             }}
             title="Bad response"
+            aria-label="Respons kurang tepat"
           >
             <ThumbsDown size={14} />
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            type="button"
             className="msg-action-btn"
             onClick={handleSpeak}
-            title={speaking ? "Stop speaking" : "Read aloud"}
+            title={speaking ? "Stop speaking" : "Bacakan pesan"}
+            aria-label={speaking ? "Hentikan pembacaan" : "Bacakan pesan"}
           >
             <Volume2 size={14} color={speaking ? '#2563eb' : 'currentColor'} />
-          </button>
+          </motion.button>
 
           {onRegenerate && (
-            <button
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              type="button"
               className="msg-action-btn"
               onClick={onRegenerate}
               title="Regenerate response"
+              aria-label="Buat ulang jawaban"
             >
               <RefreshCw size={14} />
-            </button>
+            </motion.button>
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
+

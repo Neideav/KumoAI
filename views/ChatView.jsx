@@ -1,10 +1,15 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import ChatArea from '../components/ChatArea';
 import ChatInput from '../components/ChatInput';
+import { routeViewVariants } from '../utils/motion';
 
 export default function ChatView({
   messages,
   isLoading,
+  requestStatus,
+  requestStartTime,
+  requestEndTime,
   streamingContent,
   streamingThinking,
   streamingSources,
@@ -25,10 +30,19 @@ export default function ChatView({
   enterToSend
 }) {
   return (
-    <div className="chat-view-container">
+    <motion.div
+      className="chat-view-container"
+      variants={routeViewVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
       <ChatArea
         messages={messages}
         isLoading={isLoading}
+        requestStatus={requestStatus}
+        requestStartTime={requestStartTime}
+        requestEndTime={requestEndTime}
         streamingContent={streamingContent}
         streamingThinking={streamingThinking}
         streamingSources={streamingSources}
@@ -51,6 +65,7 @@ export default function ChatView({
         onModelChange={onModelChange}
         enterToSend={enterToSend}
       />
-    </div>
+    </motion.div>
   );
 }
+

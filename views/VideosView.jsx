@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import {
   Video,
   Clapperboard,
@@ -9,6 +10,7 @@ import {
   Copy,
   Check
 } from 'lucide-react';
+import { routeViewVariants } from '../utils/motion';
 
 const VIDEO_TYPES = [
   { id: 'cinematic', label: 'Cinematic B-Roll', desc: 'Shot gerak lambat sinematik dengan pencahayaan dramatis.' },
@@ -43,7 +45,12 @@ Rincikan:
   };
 
   return (
-    <div className="view-container videos-view">
+    <motion.div
+      className="view-container videos-view"
+      variants={routeViewVariants}
+      initial="hidden"
+      animate="visible"
+    >
       <div className="view-header">
         <div className="view-badge">
           <Film size={16} />
@@ -114,6 +121,6 @@ Rincikan:
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

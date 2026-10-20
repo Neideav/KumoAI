@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { MotionConfig } from 'motion/react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import SettingsModal from '../components/SettingsModal';
@@ -57,11 +58,20 @@ export default function App() {
   const [isDeepSearch, setIsDeepSearch] = useState(false);
   const [isReasoning, setIsReasoning] = useState(false);
 
-  // Streaming state
+  // Streaming & Request Lifecycle state
   const [isLoading, setIsLoading] = useState(false);
+  const [requestStatus, setRequestStatus] = useState('idle'); // 'idle' | 'started' | 'waiting' | 'streaming' | 'completed' | 'cancelled' | 'error'
+  const [requestStartTime, setRequestStartTime] = useState(null);
+  const [requestEndTime, setRequestEndTime] = useState(null);
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingThinking, setStreamingThinking] = useState('');
   const [streamingSources, setStreamingSources] = useState([]);
+
+  const abortControllerRef = useRef(null);
+  const activeRequestIdRef = useRef(null);
+  const streamingContentRef = useRef('');
+  const streamingThinkingRef = useRef('');
+  const streamingSourcesRef = useRef([]);
 
   // UI state
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -118,9 +128,15 @@ export default function App() {
   const activeChat = chats.find(c => c.id === activeChatId) || chats[0] || createNewChat('Percakapan Baru');
 
   const handleSelectChat = (id) => {
+    // If request in flight, abort cleanly to prevent cross-chat state pollution
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setActiveChatIdState(id);
     setActiveChatId(id);
     setIsLoading(false);
+    setRequestStatus('idle');
     setStreamingContent('');
     setStreamingThinking('');
     setStreamingSources([]);
@@ -128,6 +144,10 @@ export default function App() {
   };
 
   const handleNewChat = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     const newChat = createNewChat('Percakapan Baru');
     setChats(prev => [newChat, ...prev]);
     setActiveChatIdState(newChat.id);
@@ -135,6 +155,7 @@ export default function App() {
     setInput('');
     setAttachment(null);
     setIsLoading(false);
+    setRequestStatus('idle');
     setStreamingContent('');
     setStreamingThinking('');
     setStreamingSources([]);
@@ -142,6 +163,10 @@ export default function App() {
   };
 
   const handleDeleteChat = (id) => {
+    if (activeChatId === id && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     const remaining = chats.filter(c => c.id !== id);
     if (remaining.length === 0) {
       const fresh = createNewChat('Percakapan Baru');
@@ -169,6 +194,54 @@ export default function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
+  // Safe Stop Handler for AI generation
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    setIsLoading(false);
+    setRequestStatus('cancelled');
+    const endTime = Date.now();
+    setRequestEndTime(endTime);
+
+    // Preserve any partial response streamed so far for the active chat
+    const targetChatId = activeRequestIdRef.current;
+    const partialText = streamingContentRef.current;
+    const partialThinking = streamingThinkingRef.current;
+    const partialSources = streamingSourcesRef.current;
+
+    if (targetChatId && (partialText || partialThinking)) {
+      const partialMessage = {
+        id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        role: 'assistant',
+        content: partialText ? `${partialText}\n\n*(Respons dihentikan)*` : '*(Respons dihentikan)*',
+        thinking: partialThinking,
+        sources: partialSources || [],
+        status: 'cancelled',
+        startTime: requestStartTime,
+        endTime: endTime,
+        timestamp: endTime
+      };
+
+      setChats(prev => prev.map(c => {
+        if (c.id === targetChatId) {
+          return {
+            ...c,
+            messages: [...(c.messages || []), partialMessage],
+            updatedAt: endTime
+          };
+        }
+        return c;
+      }));
+    }
+
+    setStreamingContent('');
+    setStreamingThinking('');
+    setStreamingSources([]);
+  }, [requestStartTime]);
+
   // Dispatch message to active chat
   const handleSendMessage = useCallback(async (customText, customAttachment) => {
     const textToSend = typeof customText === 'string' ? customText : input;
@@ -177,10 +250,19 @@ export default function App() {
     if ((!textToSend || !textToSend.trim()) && !attachmentToSend) return;
     if (isLoading) return;
 
+    // Abort any previous pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const currentChat = chats.find(c => c.id === activeChatId) || activeChat;
+    activeRequestIdRef.current = currentChat.id;
     const isFirstMessage = (currentChat.messages || []).length === 0;
 
     const userMessage = {
+      id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       role: 'user',
       content: textToSend.trim(),
       attachment: attachmentToSend,
@@ -210,6 +292,15 @@ export default function App() {
     setInput('');
     setAttachment(null);
     setIsLoading(true);
+
+    const startTime = Date.now();
+    setRequestStartTime(startTime);
+    setRequestEndTime(null);
+    setRequestStatus('started');
+
+    streamingContentRef.current = '';
+    streamingThinkingRef.current = '';
+    streamingSourcesRef.current = [];
     setStreamingContent('');
     setStreamingThinking('');
     setStreamingSources([]);
@@ -234,23 +325,36 @@ export default function App() {
         systemPrompt: promptInstruction,
         temperature: settings.temperature,
         enableSearch: isDeepSearch || settings.searchEnabled,
+        signal: controller.signal,
         onChunk: (chunk) => {
+          streamingContentRef.current += chunk;
           setStreamingContent(prev => prev + chunk);
+          setRequestStatus('streaming');
         },
         onThinking: (thinkingChunk) => {
+          streamingThinkingRef.current += thinkingChunk;
           setStreamingThinking(prev => prev + thinkingChunk);
         },
         onSources: (sources) => {
+          streamingSourcesRef.current = sources;
           setStreamingSources(sources);
         }
       });
 
+      const endTime = Date.now();
+      setRequestEndTime(endTime);
+      setRequestStatus('completed');
+
       const assistantMessage = {
+        id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         role: 'assistant',
         content: response.content,
         thinking: response.thinking,
         sources: response.sources || [],
-        timestamp: Date.now()
+        status: 'completed',
+        startTime: startTime,
+        endTime: endTime,
+        timestamp: endTime
       };
 
       setChats(prev => prev.map(c => {
@@ -258,7 +362,7 @@ export default function App() {
           return {
             ...c,
             messages: [...updatedMessages, assistantMessage],
-            updatedAt: Date.now()
+            updatedAt: endTime
           };
         }
         return c;
@@ -282,31 +386,71 @@ export default function App() {
         } catch {}
       }
     } catch (err) {
-      console.error('Gemini Send Error:', err);
-      const errorMessage = {
-        role: 'assistant',
-        content: `⚠️ Terjadi kendala saat memproses jawaban:\n\n\`\`\`\n${err.message || 'Error tidak diketahui'}\n\`\`\`\n\nPastikan koneksi internet aktif atau periksa Google Gemini API Key Anda di menu profil/pengaturan.`,
-        isError: true,
-        timestamp: Date.now()
-      };
+      const endTime = Date.now();
+      setRequestEndTime(endTime);
 
-      setChats(prev => prev.map(c => {
-        if (c.id === currentChat.id) {
-          return {
-            ...c,
-            messages: [...updatedMessages, errorMessage],
-            updatedAt: Date.now()
+      if (err.name === 'AbortError' || controller.signal.aborted) {
+        setRequestStatus('cancelled');
+        if (streamingContentRef.current || streamingThinkingRef.current) {
+          const cancelledMessage = {
+            id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            role: 'assistant',
+            content: `${streamingContentRef.current}\n\n*(Respons dihentikan)*`,
+            thinking: streamingThinkingRef.current,
+            sources: streamingSourcesRef.current || [],
+            status: 'cancelled',
+            startTime: startTime,
+            endTime: endTime,
+            timestamp: endTime
           };
+
+          setChats(prev => prev.map(c => {
+            if (c.id === currentChat.id) {
+              return {
+                ...c,
+                messages: [...updatedMessages, cancelledMessage],
+                updatedAt: endTime
+              };
+            }
+            return c;
+          }));
         }
-        return c;
-      }));
+      } else {
+        console.error('Gemini Send Error:', err);
+        setRequestStatus('error');
+        const errorMessage = {
+          id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          role: 'assistant',
+          content: `⚠️ Terjadi kendala saat memproses jawaban:\n\n\`\`\`\n${err.message || 'Error tidak diketahui'}\n\`\`\`\n\nPastikan koneksi internet aktif atau periksa Google Gemini API Key Anda di menu profil/pengaturan.`,
+          isError: true,
+          status: 'error',
+          startTime: startTime,
+          endTime: endTime,
+          timestamp: endTime
+        };
+
+        setChats(prev => prev.map(c => {
+          if (c.id === currentChat.id) {
+            return {
+              ...c,
+              messages: [...updatedMessages, errorMessage],
+              updatedAt: endTime
+            };
+          }
+          return c;
+        }));
+      }
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setIsLoading(false);
       setStreamingContent('');
       setStreamingThinking('');
       setStreamingSources([]);
     }
   }, [input, attachment, isLoading, chats, activeChatId, activeChat, settings, apiKey, isReasoning, isDeepSearch]);
+
 
   const handleClearAllChats = () => {
     const fresh = createNewChat('Percakapan Baru');
@@ -379,128 +523,133 @@ export default function App() {
   };
 
   return (
-    <div className="app-layout-root">
-      {/* Sidebar Rail & Drawer */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(prev => !prev)}
-        chats={chats}
-        activeChatId={activeChatId}
-        onSelectChat={handleSelectChat}
-        onNewChat={handleNewChat}
-        onDeleteChat={handleDeleteChat}
-        onRenameChat={handleRenameChat}
-        onTogglePinChat={handleTogglePinChat}
-        notebooks={notebooks}
-        activeRoute={activeRoute}
-        onRouteChange={(route) => setActiveRoute(route)}
-        onOpenShareModal={(chat) => {
-          setSharedChat(chat || activeChat);
-          setIsShareModalOpen(true);
-        }}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
-        user={user}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-      />
-
-      {/* Main Workspace Area */}
-      <main className="app-main-viewport">
-        <Header
-          onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
-          theme={theme}
-          onToggleTheme={handleToggleTheme}
-          onOpenShareModal={() => {
-            setSharedChat(activeChat);
+    <MotionConfig reducedMotion="user">
+      <div className="app-layout-root">
+        {/* Sidebar Rail & Drawer */}
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onToggle={() => setIsSidebarOpen(prev => !prev)}
+          chats={chats}
+          activeChatId={activeChatId}
+          onSelectChat={handleSelectChat}
+          onNewChat={handleNewChat}
+          onDeleteChat={handleDeleteChat}
+          onRenameChat={handleRenameChat}
+          onTogglePinChat={handleTogglePinChat}
+          notebooks={notebooks}
+          activeRoute={activeRoute}
+          onRouteChange={(route) => setActiveRoute(route)}
+          onOpenShareModal={(chat) => {
+            setSharedChat(chat || activeChat);
             setIsShareModalOpen(true);
           }}
-          currentRouteTitle={getRouteTitle()}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+          user={user}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
         />
 
-        {/* Dynamic Route View Rendering */}
-        <div className="view-content-router">
-          {activeRoute === 'chat' && (
-            <ChatView
-              messages={activeChat.messages || []}
-              isLoading={isLoading}
-              streamingContent={streamingContent}
-              streamingThinking={streamingThinking}
-              streamingSources={streamingSources}
-              onSelectSuggestion={(prompt) => handleSendMessage(prompt)}
-              onRegenerate={handleRegenerate}
-              input={input}
-              setInput={setInput}
-              onSend={() => handleSendMessage()}
-              onStop={() => setIsLoading(false)}
-              attachment={attachment}
-              setAttachment={setAttachment}
-              isDeepSearch={isDeepSearch}
-              setIsDeepSearch={setIsDeepSearch}
-              isReasoning={isReasoning}
-              setIsReasoning={setIsReasoning}
-              currentModel={settings.model || 'gemini-3.6-flash'}
-              onModelChange={handleModelChange}
-              enterToSend={settings.enterToSend}
-            />
-          )}
+        {/* Main Workspace Area */}
+        <main className="app-main-viewport">
+          <Header
+            onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+            theme={theme}
+            onToggleTheme={handleToggleTheme}
+            onOpenShareModal={() => {
+              setSharedChat(activeChat);
+              setIsShareModalOpen(true);
+            }}
+            currentRouteTitle={getRouteTitle()}
+          />
 
-          {activeRoute === 'students' && (
-            <StudentsView
-              onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
-            />
-          )}
+          {/* Dynamic Route View Rendering */}
+          <div className="view-content-router">
+            {activeRoute === 'chat' && (
+              <ChatView
+                messages={activeChat.messages || []}
+                isLoading={isLoading}
+                requestStatus={requestStatus}
+                requestStartTime={requestStartTime}
+                requestEndTime={requestEndTime}
+                streamingContent={streamingContent}
+                streamingThinking={streamingThinking}
+                streamingSources={streamingSources}
+                onSelectSuggestion={(prompt) => handleSendMessage(prompt)}
+                onRegenerate={handleRegenerate}
+                input={input}
+                setInput={setInput}
+                onSend={() => handleSendMessage()}
+                onStop={handleStopGeneration}
+                attachment={attachment}
+                setAttachment={setAttachment}
+                isDeepSearch={isDeepSearch}
+                setIsDeepSearch={setIsDeepSearch}
+                isReasoning={isReasoning}
+                setIsReasoning={setIsReasoning}
+                currentModel={settings.model || 'gemini-3.6-flash'}
+                onModelChange={handleModelChange}
+                enterToSend={settings.enterToSend}
+              />
+            )}
 
-          {activeRoute === 'images' && (
-            <ImagesView
-              onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
-            />
-          )}
+            {activeRoute === 'students' && (
+              <StudentsView
+                onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
+              />
+            )}
 
-          {activeRoute === 'videos' && (
-            <VideosView
-              onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
-            />
-          )}
+            {activeRoute === 'images' && (
+              <ImagesView
+                onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
+              />
+            )}
 
-          {activeRoute === 'library' && (
-            <LibraryView
-              onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
-            />
-          )}
+            {activeRoute === 'videos' && (
+              <VideosView
+                onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
+              />
+            )}
 
-          {activeRoute === 'journal' && (
-            <JournalView
-              notebooks={notebooks}
-              onSaveNotebooks={setNotebooks}
-              onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
-            />
-          )}
-        </div>
-      </main>
+            {activeRoute === 'library' && (
+              <LibraryView
+                onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
+              />
+            )}
 
-      {/* Modals */}
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        settings={settings}
-        onSaveSettings={(s) => setSettings(s)}
-        theme={theme}
-        onToggleTheme={handleToggleTheme}
-        chats={chats}
-        onClearAllChats={handleClearAllChats}
-      />
+            {activeRoute === 'journal' && (
+              <JournalView
+                notebooks={notebooks}
+                onSaveNotebooks={setNotebooks}
+                onLaunchChatWithPrompt={handleLaunchChatWithPrompt}
+              />
+            )}
+          </div>
+        </main>
 
-      <ShareModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        chat={sharedChat || activeChat}
-      />
+        {/* Modals */}
+        <SettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+          settings={settings}
+          onSaveSettings={(s) => setSettings(s)}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
+          chats={chats}
+          onClearAllChats={handleClearAllChats}
+        />
 
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        user={user}
-        onUpdateUser={(u) => setUser(u)}
-      />
-    </div>
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          chat={sharedChat || activeChat}
+        />
+
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          user={user}
+          onUpdateUser={(u) => setUser(u)}
+        />
+      </div>
+    </MotionConfig>
   );
 }

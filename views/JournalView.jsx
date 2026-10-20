@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import {
   BookOpen,
   Plus,
@@ -10,6 +11,7 @@ import {
   Send,
   Save
 } from 'lucide-react';
+import { routeViewVariants } from '../utils/motion';
 
 export default function JournalView({
   notebooks,
@@ -88,7 +90,12 @@ export default function JournalView({
   );
 
   return (
-    <div className="view-container journal-full-view">
+    <motion.div
+      className="view-container journal-full-view"
+      variants={routeViewVariants}
+      initial="hidden"
+      animate="visible"
+    >
       <div className="journal-sidebar-pane">
         <div className="journal-pane-header">
           <div className="view-badge">
@@ -225,6 +232,6 @@ export default function JournalView({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

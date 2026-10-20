@@ -1,0 +1,277 @@
+/* ==========================================================================
+   React Bits Thought Line - Adapted for KumoAI Design System
+   ========================================================================== */
+
+.thought-line {
+  --tl-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --tl-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --tl-font: 13.5px;
+  --tl-color: var(--text-secondary);
+  --tl-glyph: var(--accent-purple);
+  --tl-settle: 300ms;
+  --tl-blur: 2px;
+  --tl-shimmer: 1.8s;
+  --tl-done: 0.78;
+  --tl-timer: 0.58;
+
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  color: var(--tl-color);
+  font-family: var(--font-main);
+  font-size: var(--tl-font);
+  font-weight: 500;
+  line-height: 1.35;
+  margin-bottom: 8px;
+  user-select: none;
+}
+
+.thought-line__head {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  outline: none;
+  cursor: default;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.thought-line__head[data-toggle] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.thought-line__head[data-toggle]:hover {
+  background-color: var(--border-subtle);
+  border-color: var(--border-subtle);
+}
+
+.thought-line__head:focus-visible {
+  outline: 2px solid var(--accent-purple);
+  outline-offset: 1px;
+}
+
+.thought-line__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  color: var(--tl-glyph);
+}
+
+.thought-line__glyph svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.thought-line__label {
+  display: inline-grid;
+}
+
+.thought-line__text {
+  grid-area: 1 / 1;
+  width: max-content;
+  opacity: 0;
+  filter: blur(var(--tl-blur));
+  transition:
+    opacity var(--tl-settle) var(--tl-ease-out),
+    filter var(--tl-settle) var(--tl-ease-out);
+}
+
+.thought-line__text[data-active] {
+  opacity: 1;
+  filter: blur(0);
+}
+
+.thought-line__text--done[data-active] {
+  opacity: var(--tl-done);
+}
+
+.thought-line__breath {
+  display: inline-block;
+}
+
+.thought-line[data-working] .thought-line__breath[data-shimmer] {
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--tl-color) 45%, transparent) 25%,
+    var(--tl-color) 50%,
+    color-mix(in srgb, var(--tl-color) 45%, transparent) 75%
+  );
+  background-size: 250% 100%;
+  background-position: 125% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: thought-line-shimmer var(--tl-shimmer) linear infinite;
+}
+
+@keyframes thought-line-shimmer {
+  to {
+    background-position: -125% 0;
+  }
+}
+
+.thought-line__timer {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+  opacity: var(--tl-timer);
+  color: var(--text-muted);
+  margin-left: 0.2em;
+  transition:
+    opacity var(--tl-settle) ease,
+    transform var(--tl-settle) var(--tl-ease-in-out);
+}
+
+.thought-line__timer[data-done] {
+  opacity: var(--tl-done);
+}
+
+.thought-line__chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.15em;
+  opacity: 0.55;
+  transition:
+    opacity 180ms ease,
+    transform 200ms var(--tl-ease-out);
+}
+
+.thought-line[data-open] .thought-line__chevron {
+  transform: rotate(180deg);
+}
+
+.thought-line__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Collapsible Trace / Details */
+.thought-line__trace {
+  display: grid;
+  grid-template-rows: 0fr;
+  width: 0;
+  min-width: 100%;
+  max-width: 100%;
+  transition: grid-template-rows var(--tl-settle) var(--tl-ease-out);
+}
+
+.thought-line__trace[data-open] {
+  grid-template-rows: 1fr;
+}
+
+.thought-line__fold {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.thought-line__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  width: 100%;
+  padding: 0.5em 0 0.4em 1.6em;
+  font-size: 0.88em;
+  font-weight: 400;
+}
+
+.thought-line__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55em;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 180ms var(--tl-ease-out),
+    transform 180ms var(--tl-ease-out);
+}
+
+.thought-line__mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1.1em;
+  height: 1.1em;
+  margin-top: 0.1em;
+  opacity: 0.75;
+}
+
+.thought-line__pulse {
+  display: block;
+  width: 0.42em;
+  height: 0.42em;
+  border-radius: 50%;
+  background: var(--accent-purple);
+  animation: thought-line-pulse 1.4s var(--tl-ease-in-out) infinite;
+}
+
+@keyframes thought-line-pulse {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.thought-line__step-text {
+  color: var(--text-secondary);
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  transition: opacity var(--tl-settle) ease;
+}
+
+.thought-line__step[data-done] .thought-line__step-text {
+  opacity: 0.75;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .thought-line__text {
+    filter: none !important;
+    transition: opacity var(--tl-settle) ease;
+  }
+
+  .thought-line[data-working] .thought-line__breath[data-shimmer] {
+    animation: none !important;
+    background: none !important;
+    color: var(--tl-color) !important;
+    -webkit-text-fill-color: var(--tl-color) !important;
+  }
+
+  .thought-line__timer {
+    transition: opacity var(--tl-settle) ease;
+  }
+
+  .thought-line__step {
+    transform: none !important;
+    transition: opacity 180ms ease;
+  }
+
+  .thought-line__pulse {
+    animation: none;
+    opacity: 0.75;
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import {
   Library,
   Bookmark,
@@ -19,7 +20,7 @@ import {
   Filter,
   X
 } from 'lucide-react';
-
+import { routeViewVariants } from '../utils/motion';
 import { getCustomPrompts, saveCustomPrompts } from '../utils/storage';
 
 const SYSTEM_TEMPLATES = [
@@ -231,7 +232,12 @@ export default function LibraryView({ onLaunchChatWithPrompt }) {
     .filter(Boolean);
 
   return (
-    <div className="view-container library-view">
+    <motion.div
+      className="view-container library-view"
+      variants={routeViewVariants}
+      initial="hidden"
+      animate="visible"
+    >
       <div className="view-header">
         <div className="view-header-top-row">
           <div>
@@ -444,6 +450,6 @@ export default function LibraryView({ onLaunchChatWithPrompt }) {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
   User,
@@ -15,6 +16,7 @@ import {
   Layers,
   Star
 } from 'lucide-react';
+import { modalOverlayVariants, modalCardVariants } from '../utils/motion';
 
 const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
@@ -54,6 +56,17 @@ export default function AuthModal({
   const [selectedPlan, setSelectedPlan] = useState(user?.plan || 'Kumo Pro');
   const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || AVATAR_PRESETS[0]);
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -152,8 +165,23 @@ export default function AuthModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card auth-modal-card" onClick={(e) => e.stopPropagation()}>
+    <AnimatePresence>
+      <motion.div
+        className="modal-overlay"
+        variants={modalOverlayVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        onClick={onClose}
+      >
+        <motion.div
+          className="modal-card auth-modal-card"
+          variants={modalCardVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Modal Header */}
         <div className="modal-header">
           <div className="modal-title">
@@ -394,7 +422,8 @@ export default function AuthModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

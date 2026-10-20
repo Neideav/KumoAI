@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Settings,
   X,
@@ -19,6 +20,7 @@ import {
   Sparkles,
   Check
 } from 'lucide-react';
+import { modalOverlayVariants, modalCardVariants } from '../utils/motion';
 
 const TABS = [
   { id: 'tampilan', label: 'Tampilan', icon: Palette },
@@ -53,6 +55,17 @@ export default function SettingsModal({
 }) {
   const [activeTab, setActiveTab] = useState('tampilan');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -94,8 +107,23 @@ export default function SettingsModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card settings-modal-card" onClick={(e) => e.stopPropagation()}>
+    <AnimatePresence>
+      <motion.div
+        className="modal-overlay"
+        variants={modalOverlayVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        onClick={onClose}
+      >
+        <motion.div
+          className="modal-card settings-modal-card"
+          variants={modalCardVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Modal Header */}
         <div className="modal-header">
           <div className="modal-title">
@@ -406,7 +434,8 @@ export default function SettingsModal({
             Simpan & Selesai
           </button>
         </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

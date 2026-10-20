@@ -19,6 +19,7 @@ export async function sendMessageToGemini({
   enableSearch = false,
   isDeepSearch = false,
   isReasoning = false,
+  signal = null,
   onChunk,
   onThinking,
   onSources
@@ -55,10 +56,16 @@ export async function sendMessageToGemini({
       messages: allMessages,
       isDeepSearch: effectiveSearch,
       isReasoning,
+      signal,
       onChunk,
       onThinking,
       onSources
     });
+  }
+
+  // If already aborted before start
+  if (signal?.aborted) {
+    throw new DOMException('The user aborted a request.', 'AbortError');
   }
 
   // Format messages into Gemini API contents structure
@@ -97,6 +104,15 @@ export async function sendMessageToGemini({
     }
   };
 
+  // Add Google Search tool if search grounding is active
+  if (effectiveSearch) {
+    requestBody.tools = [
+      {
+        googleSearch: {}
+      }
+    ];
+  }
+
   if (systemPrompt && systemPrompt.trim()) {
     requestBody.systemInstruction = {
       parts: [{ text: systemPrompt }]
@@ -104,17 +120,6 @@ export async function sendMessageToGemini({
   }
 
   const collectedSources = [];
-  if (effectiveSearch) {
-    const defaultSources = [
-      { title: 'Google Web Index & Knowledge Graph', url: 'https://google.com' },
-      { title: 'Developer & Technical Docs', url: 'https://developer.mozilla.org' },
-      { title: 'Kumo AI Knowledge Base', url: 'https://gemini.google.com' }
-    ];
-    collectedSources.push(...defaultSources);
-    if (onSources) {
-      onSources(defaultSources);
-    }
-  }
 
   let fullThinking = '';
   if (isReasoning && onThinking) {
@@ -131,7 +136,8 @@ export async function sendMessageToGemini({
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: signal || undefined
     });
 
     if (!response.ok) {
@@ -154,6 +160,13 @@ export async function sendMessageToGemini({
     let buffer = '';
 
     while (true) {
+      if (signal?.aborted) {
+        try {
+          await reader.cancel();
+        } catch {}
+        throw new DOMException('The user aborted a request.', 'AbortError');
+      }
+
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -170,6 +183,25 @@ export async function sendMessageToGemini({
             const data = JSON.parse(jsonStr);
             const candidate = data.candidates?.[0];
             const parts = candidate?.content?.parts || [];
+
+            // Extract genuine grounding metadata if returned by API
+            const groundingChunks = candidate?.groundingMetadata?.groundingChunks;
+            if (groundingChunks && Array.isArray(groundingChunks)) {
+              let updatedSources = false;
+              for (const chunk of groundingChunks) {
+                if (chunk.web?.uri) {
+                  const uri = chunk.web.uri;
+                  const title = chunk.web.title || uri;
+                  if (!collectedSources.some(s => s.url === uri)) {
+                    collectedSources.push({ title, url: uri });
+                    updatedSources = true;
+                  }
+                }
+              }
+              if (updatedSources && onSources) {
+                onSources([...collectedSources]);
+              }
+            }
 
             for (const part of parts) {
               if (part.thought) {
@@ -193,9 +225,30 @@ export async function sendMessageToGemini({
       sources: collectedSources
     };
   } catch (err) {
-    console.error('Gemini API call failed:', err);
+    if (err.name === 'AbortError' || signal?.aborted) {
+      console.log('Gemini request was cancelled by user.');
+    } else {
+      console.error('Gemini API call failed:', err);
+    }
     throw err;
   }
+}
+
+function abortableSleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      return reject(new DOMException('The user aborted a request.', 'AbortError'));
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('The user aborted a request.', 'AbortError'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 // Fallback simulator when no valid key is entered
@@ -203,12 +256,13 @@ async function simulateGeminiResponse({
   messages = [],
   isDeepSearch,
   isReasoning,
+  signal,
   onChunk,
   onThinking,
   onSources
 }) {
   // Realistic initial thinking delay so the loading indicator is visibly displayed
-  await new Promise(r => setTimeout(r, 650));
+  await abortableSleep(550, signal);
 
   const lastUserMsg = messages[messages.length - 1];
   const query = lastUserMsg ? (lastUserMsg.content || '').toLowerCase() : '';
@@ -216,17 +270,6 @@ async function simulateGeminiResponse({
   const hasAttachment = lastUserMsg?.attachment;
 
   const sources = [];
-  if (isDeepSearch) {
-    const simulatedSources = [
-      { title: 'Kumo AI Knowledge Hub', url: 'https://kumo.ai' },
-      { title: 'Google Gemini Architecture Overview', url: 'https://blog.google/technology/ai/' },
-      { title: 'Modern Web & UI Engineering Guides', url: 'https://web.dev/' }
-    ];
-    sources.push(...simulatedSources);
-    if (onSources) {
-      onSources(simulatedSources);
-    }
-  }
 
   let thinking = '';
   if (isReasoning && onThinking) {
@@ -236,9 +279,9 @@ async function simulateGeminiResponse({
       'Menyusun solusi komprehensif, terstruktur, dan akurat...'
     ];
     for (const t of thoughts) {
+      await abortableSleep(280, signal);
       thinking += t + '\n';
       onThinking(t + ' ');
-      await new Promise(r => setTimeout(r, 320));
     }
   }
 
@@ -249,7 +292,7 @@ async function simulateGeminiResponse({
   } else if (query.includes('halo') || query.includes('hai') || query.includes('hello')) {
     responseContent = `Halo! 👋 Saya **Kumo**, asisten AI cerdas Anda.\n\nAda yang bisa saya bantu hari ini? Anda bisa meminta saya untuk:\n- 💻 Menulis atau memperbaiki kode pemrograman\n- 🎓 Menjelaskan konsep dan materi belajar\n- 🎨 Membuat prompt gambar atau skrip video\n- 💡 Brainstorming ide dan merancang solusi kreatif`;
   } else if (query.includes('error') || query.includes('bug') || query.includes('kenapa') || query.includes('loading')) {
-    responseContent = `Tentu, mari kita telusuri bersama! 🔍\n\n### Analisis:\nSetiap kali Anda mengirim pesan, Kumo AI akan menampilkan **indikator animasi loading / typing dots** secara real-time saat merumuskan jawaban.\n\n1. **Animasi Berpikir**: Menampilkan indikator denyut dan tiga titik bergelombang (*wave dots*) saat menunggu respons.\n2. **Streaming Teks**: Jawaban langsung muncul kata demi kata dengan kursor interaktif yang dinamis.\n3. **Reasoning Mode**: Jika tombol *Reason* diaktifkan, proses penalaran langkah demi langkah akan ditampilkan secara langsung.\n\nSilakan coba kirimkan topik apa saja untuk mencobanya! ✨`;
+    responseContent = `Tentu, mari kita telusuri bersama! 🔍\n\n### Analisis:\nSetiap kali Anda mengirim pesan, Kumo AI akan menampilkan **indikator Thought Line** secara real-time saat merumuskan jawaban.\n\n1. **Indikator Respons**: Menampilkan status dinamis dan timer akurat saat memproses jawaban.\n2. **Streaming Teks**: Jawaban langsung muncul kata demi kata dengan kursor interaktif yang dinamis.\n3. **Reasoning Mode**: Jika tombol *Reason* diaktifkan, proses penalaran langkah demi langkah akan ditampilkan secara terstruktur.\n\nSilakan coba kirimkan topik apa saja untuk mencobanya! ✨`;
   } else {
     responseContent = `Tentu! Berikut adalah tanggapan untuk: **"${rawQuery}"** ✨\n\n### Ringkasan & Solusi:\n1. **Respons Cepat**: Sistem memproses masukan Anda secara real-time dengan streaming teks interaktif.\n2. **Kustomisasi Fleksibel**: Anda dapat mengatur model AI, tema visual, serta mengaktifkan mode *Deep Search* atau *Reasoning* melalui bilah masukan di bawah.\n3. **Dukungan Penuh**: Hubungkan Google Gemini API Key Anda kapan saja di menu *Pengaturan* untuk mengakses model Gemini tingkat lanjut secara langsung.\n\nApakah ada hal spesifik yang ingin kita bahas lebih dalam?`;
   }
@@ -257,11 +300,11 @@ async function simulateGeminiResponse({
   // Simulate streaming word-by-word with realistic human-paced delivery
   const words = responseContent.split(' ');
   for (let i = 0; i < words.length; i++) {
+    await abortableSleep(22, signal);
     const chunk = (i === 0 ? '' : ' ') + words[i];
     if (onChunk) {
       onChunk(chunk);
     }
-    await new Promise(r => setTimeout(r, 24));
   }
 
   return {
@@ -270,3 +313,4 @@ async function simulateGeminiResponse({
     sources: sources
   };
 }
+

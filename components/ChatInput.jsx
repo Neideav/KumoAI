@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
   Paperclip,
@@ -21,6 +22,7 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 import { GEMINI_MODELS } from '../services/geminiService';
+import { dropdownVariants } from '../utils/motion';
 
 export default function ChatInput({
   input,
@@ -76,6 +78,20 @@ export default function ChatInput({
     };
   }, [isModelMenuOpen, isToolsMenuOpen]);
 
+  // Close menus on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (isModelMenuOpen) setIsModelMenuOpen(false);
+        if (isToolsMenuOpen) setIsToolsMenuOpen(false);
+      }
+    };
+    if (isModelMenuOpen || isToolsMenuOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isModelMenuOpen, isToolsMenuOpen]);
+
   const handleKeyDown = (e) => {
     if (enterToSend !== false) {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -122,7 +138,8 @@ export default function ChatInput({
         fileInputRef.current?.click();
         break;
       case 'drive':
-        alert('Fitur sinkronisasi Google Drive: Hubungkan file langsung dari Google Workspace.');
+        setInput('Integrasi Google Workspace / Drive: Analisis materi berikut: ');
+        textareaRef.current?.focus();
         break;
       case 'image':
         setInput('Buatkan prompt gambar mendetail untuk: ');
@@ -154,6 +171,7 @@ export default function ChatInput({
         break;
     }
   };
+
 
   return (
     <div className="chat-input-wrapper">
@@ -204,143 +222,174 @@ export default function ChatInput({
             <div className="input-tools-left">
               {/* Plus Button with Rich Tools & Uploads Popover */}
               <div className="tools-menu-wrapper" ref={toolsMenuRef}>
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.94 }}
                   type="button"
                   className={`tool-icon-btn plus-btn ${isToolsMenuOpen ? 'active' : ''}`}
                   onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
                   title="Upload & Fitur Tambahan"
+                  aria-expanded={isToolsMenuOpen}
+                  aria-haspopup="menu"
+                  aria-label="Upload dan fitur tambahan"
                 >
                   <Plus size={18} strokeWidth={2.2} style={{ transform: isToolsMenuOpen ? 'rotate(45deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
-                </button>
+                </motion.button>
 
-                {isToolsMenuOpen && (
-                  <div className="tools-dropdown-menu">
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('upload')}
+                <AnimatePresence>
+                  {isToolsMenuOpen && (
+                    <motion.div
+                      className="tools-dropdown-menu"
+                      variants={dropdownVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      role="menu"
                     >
-                      <Paperclip size={16} />
-                      <span>Upload files</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('upload')}
+                        role="menuitem"
+                      >
+                        <Paperclip size={16} />
+                        <span>Upload files</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('drive')}
-                    >
-                      <HardDrive size={16} />
-                      <span>Add from Drive</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('drive')}
+                        role="menuitem"
+                      >
+                        <HardDrive size={16} />
+                        <span>Add from Drive</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('upload')}
-                    >
-                      <MoreHorizontal size={16} />
-                      <span style={{ flex: 1, textAlign: 'left' }}>More uploads</span>
-                      <ChevronRight size={14} color="var(--text-muted)" />
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('upload')}
+                        role="menuitem"
+                      >
+                        <MoreHorizontal size={16} />
+                        <span style={{ flex: 1, textAlign: 'left' }}>More uploads</span>
+                        <ChevronRight size={14} color="var(--text-muted)" />
+                      </button>
 
-                    <div className="tools-dropdown-divider" />
+                      <div className="tools-dropdown-divider" />
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('image')}
-                    >
-                      <ImageIcon size={16} color="#7c3aed" />
-                      <span>Create image</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('image')}
+                        role="menuitem"
+                      >
+                        <ImageIcon size={16} color="#7c3aed" />
+                        <span>Create image</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('video')}
-                    >
-                      <Video size={16} color="#2563eb" />
-                      <span>Create video</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('video')}
+                        role="menuitem"
+                      >
+                        <Video size={16} color="#2563eb" />
+                        <span>Create video</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('music')}
-                    >
-                      <Music size={16} color="#db2777" />
-                      <span>Create music</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('music')}
+                        role="menuitem"
+                      >
+                        <Music size={16} color="#db2777" />
+                        <span>Create music</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('canvas')}
-                    >
-                      <LayoutTemplate size={16} color="#059669" />
-                      <span>Canvas</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('canvas')}
+                        role="menuitem"
+                      >
+                        <LayoutTemplate size={16} color="#059669" />
+                        <span>Canvas</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('research')}
-                    >
-                      <Globe size={16} color="#d97706" />
-                      <span>Deep research</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('research')}
+                        role="menuitem"
+                      >
+                        <Globe size={16} color="#d97706" />
+                        <span>Deep research</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('learning')}
-                    >
-                      <GraduationCap size={16} color="#4f46e5" />
-                      <span>Guided learning</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('learning')}
+                        role="menuitem"
+                      >
+                        <GraduationCap size={16} color="#4f46e5" />
+                        <span>Guided learning</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      className="tools-dropdown-item"
-                      onClick={() => handleToolAction('research')}
-                    >
-                      <Wrench size={16} color="var(--text-muted)" />
-                      <span style={{ flex: 1, textAlign: 'left' }}>More tools</span>
-                      <ChevronRight size={14} color="var(--text-muted)" />
-                    </button>
-                  </div>
-                )}
+                      <button
+                        type="button"
+                        className="tools-dropdown-item"
+                        onClick={() => handleToolAction('research')}
+                        role="menuitem"
+                      >
+                        <Wrench size={16} color="var(--text-muted)" />
+                        <span style={{ flex: 1, textAlign: 'left' }}>More tools</span>
+                        <ChevronRight size={14} color="var(--text-muted)" />
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* Deep Search Pill */}
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 type="button"
                 className={`tool-pill-btn ${isDeepSearch ? 'active search' : ''}`}
                 onClick={() => setIsDeepSearch(!isDeepSearch)}
                 title="Toggle Deep Search"
+                aria-pressed={isDeepSearch}
               >
                 <Globe size={15} />
                 <span>Deep Search</span>
-              </button>
+              </motion.button>
 
               {/* Reason Pill */}
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 type="button"
                 className={`tool-pill-btn ${isReasoning ? 'active reason' : ''}`}
                 onClick={() => setIsReasoning(!isReasoning)}
                 title="Toggle Reasoning / Thinking Mode"
+                aria-pressed={isReasoning}
               >
                 <Lightbulb size={15} />
                 <span>Reason</span>
-              </button>
+              </motion.button>
 
               {/* Model Choice Dropdown (Replacing 3-dots) */}
               <div className="model-menu-wrapper" ref={modelMenuRef}>
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
                   type="button"
                   className={`tool-pill-btn model-select-pill ${isModelMenuOpen ? 'active' : ''}`}
                   onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
                   title="Pilih Model Gemini"
+                  aria-expanded={isModelMenuOpen}
+                  aria-haspopup="listbox"
+                  aria-label="Pilih model Gemini"
                 >
                   <Sparkles size={14} color="#6366f1" />
                   <span>{currentModelObj?.name || 'Gemini 3.6 Flash'}</span>
@@ -351,64 +400,79 @@ export default function ChatInput({
                       transition: 'transform 0.2s ease'
                     }}
                   />
-                </button>
+                </motion.button>
 
-                {isModelMenuOpen && (
-                  <div className="model-dropdown-menu">
-                    <div className="model-dropdown-header">
-                      <span>PILIH MODEL GEMINI</span>
-                    </div>
-                    <div className="model-dropdown-list">
-                      {GEMINI_MODELS.map((m) => {
-                        const isSelected = currentModel === m.id;
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            className={`model-dropdown-item ${isSelected ? 'selected' : ''}`}
-                            onClick={() => {
-                              if (onSelectModel) onSelectModel(m.id);
-                              if (onModelChange) onModelChange(m.id);
-                              setIsModelMenuOpen(false);
-                            }}
-                          >
-                            <div className="model-dropdown-item-info">
-                              <div className="model-dropdown-item-title-row">
-                                <span className="model-dropdown-name">{m.name}</span>
-                                <span className="model-dropdown-badge">{m.badge}</span>
+                <AnimatePresence>
+                  {isModelMenuOpen && (
+                    <motion.div
+                      className="model-dropdown-menu"
+                      variants={dropdownVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="exit"
+                      role="listbox"
+                    >
+                      <div className="model-dropdown-header">
+                        <span>PILIH MODEL GEMINI</span>
+                      </div>
+                      <div className="model-dropdown-list">
+                        {GEMINI_MODELS.map((m) => {
+                          const isSelected = currentModel === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              className={`model-dropdown-item ${isSelected ? 'selected' : ''}`}
+                              onClick={() => {
+                                if (onSelectModel) onSelectModel(m.id);
+                                if (onModelChange) onModelChange(m.id);
+                                setIsModelMenuOpen(false);
+                              }}
+                              role="option"
+                              aria-selected={isSelected}
+                            >
+                              <div className="model-dropdown-item-info">
+                                <div className="model-dropdown-item-title-row">
+                                 <span className="model-dropdown-name">{m.name}</span>
+                                 <span className="model-dropdown-badge">{m.badge}</span>
+                                </div>
+                                <span className="model-dropdown-desc">{m.desc}</span>
                               </div>
-                              <span className="model-dropdown-desc">{m.desc}</span>
-                            </div>
-                            {isSelected && <Check size={16} color="#2563eb" style={{ flexShrink: 0 }} />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                              {isSelected && <Check size={16} color="#2563eb" style={{ flexShrink: 0 }} />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
             {/* Send or Stop Generation Button */}
             {isLoading ? (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.94 }}
                 className="btn-send-message btn-stop-message"
                 onClick={onStop}
                 title="Hentikan respons (Stop)"
+                aria-label="Hentikan respons"
                 type="button"
               >
                 <Square size={13} fill="currentColor" />
-              </button>
+              </motion.button>
             ) : (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.94 }}
                 className="btn-send-message"
                 onClick={onSend}
                 disabled={(!input.trim() && !attachment) || isLoading}
                 title="Kirim pesan (Enter)"
+                aria-label="Kirim pesan"
                 type="button"
               >
                 <ArrowUp size={18} strokeWidth={2.5} />
-              </button>
+              </motion.button>
             )}
           </div>
         </div>

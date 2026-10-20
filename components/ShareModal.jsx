@@ -1,9 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { X, Link2, Check, Download, FileText, Copy, Share2 } from 'lucide-react';
+import { modalOverlayVariants, modalCardVariants } from '../utils/motion';
 
 export default function ShareModal({ isOpen, onClose, chat }) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
 
   if (!isOpen || !chat) return null;
 
@@ -50,8 +63,24 @@ export default function ShareModal({ isOpen, onClose, chat }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" style={{ maxWidth: '460px' }} onClick={(e) => e.stopPropagation()}>
+    <AnimatePresence>
+      <motion.div
+        className="modal-overlay"
+        variants={modalOverlayVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        onClick={onClose}
+      >
+        <motion.div
+          className="modal-card"
+          style={{ maxWidth: '460px' }}
+          variants={modalCardVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          onClick={(e) => e.stopPropagation()}
+        >
         <div className="modal-header">
           <div className="modal-title">
             <Share2 size={18} color="#2563eb" />
@@ -148,7 +177,8 @@ export default function ShareModal({ isOpen, onClose, chat }) {
             Selesai
           </button>
         </div>
-      </div>
-    </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

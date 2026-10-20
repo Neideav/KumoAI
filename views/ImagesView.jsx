@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import {
   Image as ImageIcon,
   Sparkles,
@@ -10,6 +11,7 @@ import {
   Check,
   Palette
 } from 'lucide-react';
+import { routeViewVariants } from '../utils/motion';
 
 const STYLE_PRESETS = [
   { id: 'cinematic', label: 'Cinematic Photorealistic', tag: '8k resolution, cinematic lighting, photorealistic, Unreal Engine 5 render, depth of field' },
@@ -40,7 +42,12 @@ export default function ImagesView({ onLaunchChatWithPrompt }) {
   };
 
   return (
-    <div className="view-container images-view">
+    <motion.div
+      className="view-container images-view"
+      variants={routeViewVariants}
+      initial="hidden"
+      animate="visible"
+    >
       <div className="view-header">
         <div className="view-badge">
           <ImageIcon size={16} />
@@ -122,6 +129,6 @@ export default function ImagesView({ onLaunchChatWithPrompt }) {
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

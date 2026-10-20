@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "dompurify": "^3.4.17",
     "highlight.js": "^11.9.0",
     "lucide-react": "^0.344.0",
     "marked": "^12.0.1",
+    "motion": "^14.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
